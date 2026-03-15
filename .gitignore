@@ -1,0 +1,6 @@
+node_modules/
+uploads/*.jpg
+uploads/*.png
+uploads/*.jpeg
+.DS_Store
+*.log
