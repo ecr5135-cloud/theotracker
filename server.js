@@ -93,7 +93,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/analyze-meal' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
-    req.on('end', () => {
+    req.on('end', async () => {
       try {
         const { image } = JSON.parse(body);
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
@@ -109,12 +109,63 @@ const server = http.createServer((req, res) => {
 
         fs.writeFileSync(filepath, buffer);
 
-        // Return a generic response - user should ask Theo on Telegram for analysis
+        // Analyze with OpenAI if API key available
+        let analysis = null;
+        const openaiKey = process.env.OPENAI_API_KEY;
+        
+        if (openaiKey) {
+          try {
+            const https = require('https');
+            const postData = JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: 'Analyze this meal photo. Estimate calories and protein. Respond in JSON format: {"description": "brief description", "calories": number, "protein": number}' },
+                    { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Data}` } }
+                  ]
+                }
+              ],
+              max_tokens: 300
+            });
+
+            const response = await new Promise((resolve, reject) => {
+              const req = https.request({
+                hostname: 'api.openai.com',
+                path: '/v1/chat/completions',
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${openaiKey}`
+                }
+              }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => resolve(data));
+              });
+              req.on('error', reject);
+              req.write(postData);
+              req.end();
+            });
+
+            const result = JSON.parse(response);
+            const content = result.choices?.[0]?.message?.content || '';
+            
+            // Try to extract JSON from the response
+            const jsonMatch = content.match(/\{[^}]+\}/);
+            if (jsonMatch) {
+              analysis = JSON.parse(jsonMatch[0]);
+            }
+          } catch (e) {
+            console.log('OpenAI analysis failed:', e.message);
+          }
+        }
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          description: 'Photo captured - ask Theo on Telegram to analyze this meal',
-          calories: '',
-          protein: ''
+          filename: filename,
+          analysis: analysis || { description: 'Photo saved. Add OPENAI_API_KEY for auto-analysis.', calories: null, protein: null }
         }));
       } catch (e) {
         res.writeHead(400);

@@ -522,10 +522,25 @@
                         </button>
                         <div id="photoPreview" style="display: none; margin-top: 8px;">
                             <img id="previewImg" style="width: 100%; border: 1px solid var(--border); max-height: 150px; object-fit: cover;">
-                            <button class="btn" onclick="analyzeMeal()" style="margin-top: 8px; padding: 8px;">Analyze</button>
+                            <button class="btn" onclick="analyzeMeal()" style="margin-top: 8px; padding: 8px;">🔍 Analyze Photo</button>
                         </div>
                         <div id="analyzing" style="display: none; color: var(--accent); text-align: center; padding: 8px; font-size: 11px; text-transform: uppercase;">
-                            Processing...
+                            Analyzing with AI...
+                        </div>
+                        <div id="analysisResults" style="display: none; margin-top: 12px; padding: 12px; background: var(--bg-tactical); border: 1px solid var(--border);">
+                            <div style="color: var(--accent); font-size: 10px; text-transform: uppercase; margin-bottom: 8px;">AI Analysis</div>
+                            <div id="analysisDesc" style="color: var(--text-secondary); font-size: 12px; margin-bottom: 8px;"></div>
+                            <div style="display: flex; gap: 8px;">
+                                <div style="flex: 1;">
+                                    <div style="color: var(--text-muted); font-size: 9px; text-transform: uppercase;">Calories</div>
+                                    <input type="number" id="analysisCals" style="width: 100%; margin-bottom: 0; font-size: 13px;" placeholder="0">
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="color: var(--text-muted); font-size: 9px; text-transform: uppercase;">Protein</div>
+                                    <input type="number" id="analysisProtein" style="width: 100%; margin-bottom: 0; font-size: 13px;" placeholder="0">
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary" onclick="useAnalysis()" style="margin-top: 8px; padding: 8px; font-size: 10px;">Use These Numbers</button>
                         </div>
                     </div>
 
@@ -850,6 +865,7 @@
 
             document.getElementById('analyzing').style.display = 'block';
             document.getElementById('photoPreview').style.display = 'none';
+            document.getElementById('analysisResults').style.display = 'none';
 
             try {
                 const res = await fetch('/api/analyze-meal', {
@@ -858,18 +874,43 @@
                     body: JSON.stringify({ image: currentPhotoData })
                 });
 
-                document.getElementById('analyzing').innerHTML =
-                    '📤 Photo saved!<br><br>' +
-                    '<strong>To get calorie estimate:</strong><br>' +
-                    'Send this photo to Theo on Telegram with the message:<br>' +
-                    '<em>"analyze this meal"</em><br><br>' +
-                    'I\'ll reply with estimated calories and protein!';
+                const result = await res.json();
+                
+                document.getElementById('analyzing').style.display = 'none';
+                document.getElementById('analysisResults').style.display = 'block';
+                
+                // Show analysis results
+                const analysis = result.analysis || {};
+                document.getElementById('analysisDesc').textContent = analysis.description || 'Could not analyze';
+                document.getElementById('analysisCals').value = analysis.calories || '';
+                document.getElementById('analysisProtein').value = analysis.protein || '';
+                
+                // If no AI analysis available, show helpful message
+                if (!analysis.calories) {
+                    document.getElementById('analysisDesc').innerHTML = 
+                        '📸 Photo saved!<br><br>' +
+                        'To enable AI analysis, add your OpenAI API key:<br>' +
+                        '<code>export OPENAI_API_KEY=your-key</code><br>' +
+                        'Or manually enter estimates below.';
+                }
 
-                currentPhotoData = null;
-                document.getElementById('mealPhoto').value = '';
             } catch (e) {
-                document.getElementById('analyzing').textContent = 'Failed to save photo. Try again.';
+                document.getElementById('analyzing').textContent = 'Analysis failed. Try again.';
             }
+        }
+
+        function useAnalysis() {
+            const cals = document.getElementById('analysisCals').value;
+            const protein = document.getElementById('analysisProtein').value;
+            
+            if (cals) document.getElementById('calories').value = cals;
+            if (protein) document.getElementById('protein').value = protein;
+            
+            // Hide analysis, show meal input
+            document.getElementById('analysisResults').style.display = 'none';
+            
+            // Optional haptic feedback
+            if (navigator.vibrate) navigator.vibrate(50);
         }
 
         async function saveMeal() {
