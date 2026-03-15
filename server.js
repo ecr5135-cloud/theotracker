@@ -6,11 +6,15 @@ const { addExerciseToToday, loadData, saveData } = require('./session');
 
 const PORT = 8081;
 
-// Auto-commit helper
+// Batched auto-commit - commit 30 seconds after last change
+let commitTimeout = null;
 function gitCommit(message) {
-  exec(`cd "${__dirname}" && git add data.json && git commit -m "${message}" && git push`, (err) => {
-    if (err) console.log('Git commit skipped or failed:', err.message);
-  });
+  if (commitTimeout) clearTimeout(commitTimeout);
+  commitTimeout = setTimeout(() => {
+    exec(`cd "${__dirname}" && git add data.json && git commit -m "${message}" && git push`, (err) => {
+      if (err) console.log('Git commit skipped or failed:', err.message);
+    });
+  }, 30000); // 30 second delay
 }
 
 const server = http.createServer((req, res) => {

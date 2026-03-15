@@ -445,10 +445,11 @@
     </div>
 
     <div class="nav">
-        <button class="nav-btn active" onclick="showSection('log')">Log</button>
-        <button class="nav-btn" onclick="showSection('plan')">Plan</button>
-        <button class="nav-btn" onclick="showSection('history')">History</button>
-        <button class="nav-btn" onclick="showSection('progress')">Progress</button>
+        <button class="nav-btn active" onclick="showSection('log', this)">Log</button>
+        <button class="nav-btn" onclick="showSection('plan', this)">Plan</button>
+        <button class="nav-btn" onclick="showSection('history', this)">History</button>
+        <button class="nav-btn" onclick="showSection('meals', this)">Meals</button>
+        <button class="nav-btn" onclick="showSection('progress', this)">Progress</button>
     </div>
 
     <div class="content">
@@ -663,6 +664,25 @@
             </div>
         </div>
 
+        <!-- MEALS SECTION -->
+        <div id="meals" class="section">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg-tactical); border-bottom: 1px solid var(--border);">
+                    <h3 style="border: none; padding: 0;">Today's Nutrition</h3>
+                    <div id="meal-totals" style="display: none; font-size: 11px; color: var(--text-muted);">
+                        <span id="total-cals" style="color: var(--accent); font-weight: 600;"></span> cal · 
+                        <span id="total-protein" style="color: var(--accent); font-weight: 600;"></span> protein
+                    </div>
+                </div>
+                <div id="meal-list"><div class="empty-state">No meals logged today.</div></div>
+            </div>
+            
+            <div class="card">
+                <h3>Recent Meals</h3>
+                <div id="meal-history"><div class="empty-state">No meal history.</div></div>
+            </div>
+        </div>
+
         <!-- PROGRESS SECTION -->
         <div id="progress" class="section">
             <div class="card">
@@ -711,14 +731,15 @@
             setTimeout(() => icon.classList.remove('spinning'), 500);
         }
 
-        function showSection(section) {
+        function showSection(section, clickedBtn) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(section).classList.add('active');
-            event.target.classList.add('active');
+            if (clickedBtn) clickedBtn.classList.add('active');
             if (section === 'history') renderHistory();
             if (section === 'progress') initProgress();
             if (section === 'plan') renderPlan();
+            if (section === 'meals') renderMeals();
         }
 
         function setExercise(name) { document.getElementById('exercise').value = name; }
@@ -1023,6 +1044,58 @@
             return exercises.reduce((total, e) => {
                 return total + e.sets.reduce((sum, s) => sum + (s.weight * s.reps), 0);
             }, 0);
+        }
+
+        function renderMeals() {
+            const todayKey = new Date().toISOString().split('T')[0];
+            const mealList = document.getElementById('meal-list');
+            const mealHistory = document.getElementById('meal-history');
+            const totalsDiv = document.getElementById('meal-totals');
+            const totalCals = document.getElementById('total-cals');
+            const totalProtein = document.getElementById('total-protein');
+            
+            // Today's meals
+            const todaysMeals = meals.filter(m => m.date.startsWith(todayKey));
+            
+            if (todaysMeals.length === 0) {
+                mealList.innerHTML = '<div class="empty-state">No meals logged today.</div>';
+                totalsDiv.style.display = 'none';
+            } else {
+                const todayCalories = todaysMeals.reduce((sum, m) => sum + (parseInt(m.calories) || 0), 0);
+                const todayProtein = todaysMeals.reduce((sum, m) => sum + (parseInt(m.protein) || 0), 0);
+                
+                totalCals.textContent = todayCalories;
+                totalProtein.textContent = todayProtein + 'g';
+                totalsDiv.style.display = 'block';
+                
+                mealList.innerHTML = todaysMeals.map(m => {
+                    const time = new Date(m.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    return `
+                        <div class="workout-item">
+                            <div class="exercise">${m.meal || m.name || 'Meal'}</div>
+                            <div class="sets">${time} · ${m.calories || '?'} cal · ${m.protein || '?'}g protein</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            // Recent meals (excluding today)
+            const recentMeals = meals.filter(m => !m.date.startsWith(todayKey)).slice(0, 10);
+            
+            if (recentMeals.length === 0) {
+                mealHistory.innerHTML = '<div class="empty-state">No meal history.</div>';
+            } else {
+                mealHistory.innerHTML = recentMeals.map(m => {
+                    const date = new Date(m.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    const time = new Date(m.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    return `
+                        <div class="workout-item">
+                            <div class="exercise">${m.meal || m.name || 'Meal'}</div>
+                            <div class="sets">${date} ${time} · ${m.calories || '?'} cal · ${m.protein || '?'}g protein</div>
+                        </div>
+                    `;
+                }).join('');
+            }
         }
 
         function renderHistory() {
@@ -1482,7 +1555,7 @@
         // Swipe between tabs
         let touchStartX = 0;
         let touchEndX = 0;
-        const sections = ['log', 'plan', 'history', 'progress'];
+        const sections = ['log', 'plan', 'history', 'meals', 'progress'];
 
         document.addEventListener('touchstart', (e) => {
             touchStartX = e.changedTouches[0].screenX;
@@ -1520,6 +1593,7 @@
             if (section === 'history') renderHistory();
             if (section === 'progress') initProgress();
             if (section === 'plan') renderPlan();
+            if (section === 'meals') renderMeals();
         }
 
         // Streak calculator
