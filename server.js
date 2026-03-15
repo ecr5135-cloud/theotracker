@@ -1,9 +1,17 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
 const { addExerciseToToday, loadData, saveData } = require('./session');
 
 const PORT = 8081;
+
+// Auto-commit helper
+function gitCommit(message) {
+  exec(`cd "${__dirname}" && git add data.json && git commit -m "${message}" && git push`, (err) => {
+    if (err) console.log('Git commit skipped or failed:', err.message);
+  });
+}
 
 const server = http.createServer((req, res) => {
   // CORS
@@ -39,6 +47,7 @@ const server = http.createServer((req, res) => {
         if (result.success) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true, isPR: result.isPR }));
+          gitCommit(`Workout: ${result.exercise} ${result.thisMax}lbs`);
         } else {
           res.writeHead(400);
           res.end(JSON.stringify({ error: result.error }));
@@ -67,6 +76,7 @@ const server = http.createServer((req, res) => {
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
+        gitCommit(`Meal: ${meal.meal.substring(0, 30)}${meal.meal.length > 30 ? '...' : ''}`);
       } catch (e) {
         res.writeHead(400);
         res.end(JSON.stringify({ error: e.message }));
@@ -131,6 +141,7 @@ const server = http.createServer((req, res) => {
         saveData(data);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
+        gitCommit(`Bodyweight: ${weight} lbs`);
       } catch (e) {
         res.writeHead(400);
         res.end(JSON.stringify({ error: e.message }));

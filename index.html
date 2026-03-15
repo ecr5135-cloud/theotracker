@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4ade80">
+    <link rel="manifest" href="/manifest.json">
     <title>TheoTracker</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -450,6 +452,20 @@
     </div>
 
     <div class="content">
+        <!-- Streak Banner -->
+        <div id="streak-banner" class="card" style="display: none; margin-bottom: 12px;">
+            <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;">
+                <div>
+                    <div style="color: var(--accent); font-size: 24px; font-weight: 700;">🔥 <span id="streak-count">0</span></div>
+                    <div style="color: var(--text-muted); font-size: 10px; text-transform: uppercase;">Day Streak</div>
+                </div>
+                <div id="deload-warning" style="display: none; color: var(--warning); font-size: 11px; text-align: right;">
+                    <div>⚠️ 6+ weeks!</div>
+                    <div style="color: var(--text-muted); font-size: 9px;">Consider a deload</div>
+                </div>
+            </div>
+        </div>
+
         <!-- LOG SECTION -->
         <div id="log" class="section active">
             <div class="card">
@@ -674,7 +690,11 @@
                 meals = data.meals || [];
                 bodyweights = data.bodyweights || [];
                 updateBodyweightDisplay();
-            } catch (e) { console.error('Failed to load data:', e); }
+                updateStreakDisplay();
+            } catch (e) { 
+                console.error('Failed to load data:', e);
+                showOfflineWarning();
+            }
         }
 
         async function refresh() {
@@ -839,6 +859,21 @@
                 display.style.display = 'block';
             } else {
                 display.style.display = 'none';
+            }
+        }
+
+        function updateStreakDisplay() {
+            const streak = calculateStreak();
+            const banner = document.getElementById('streak-banner');
+            const count = document.getElementById('streak-count');
+            const deloadWarning = document.getElementById('deload-warning');
+            
+            if (streak.current > 0) {
+                count.textContent = streak.current;
+                banner.style.display = 'block';
+                deloadWarning.style.display = streak.needsDeload ? 'block' : 'none';
+            } else {
+                banner.style.display = 'none';
             }
         }
 
@@ -1315,6 +1350,21 @@
             const needsDeload = streak >= 42;
             
             return { current: streak, needsDeload };
+        }
+
+        function showOfflineWarning() {
+            const banner = document.getElementById('streak-banner');
+            banner.style.display = 'block';
+            banner.innerHTML = `
+                <div class="card-body" style="padding: 12px 16px; text-align: center;">
+                    <div style="color: var(--warning); font-size: 11px;">⚠️ Server offline — check connection</div>
+                </div>
+            `;
+        }
+
+        // Register Service Worker for offline support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
         }
 
         setInterval(refresh, 10000);
