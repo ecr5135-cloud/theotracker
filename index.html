@@ -469,6 +469,26 @@
 
         <!-- LOG SECTION -->
         <div id="log" class="section active">
+            <!-- Recovery Check -->
+            <div class="card" id="recovery-card" style="display: none;">
+                <h3>Recovery Check</h3>
+                <div class="card-body">
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <input type="number" id="sleep-hours" placeholder="Sleep (hrs)" style="flex: 1;">
+                        <input type="number" id="resting-hr" placeholder="RHR" style="flex: 1;">
+                    </div>
+                    <select id="recovery-feeling" style="margin-bottom: 8px;">
+                        <option value="">How do you feel?</option>
+                        <option value="great">Great - Ready to crush it</option>
+                        <option value="good">Good - Normal energy</option>
+                        <option value="okay">Okay - Slight fatigue</option>
+                        <option value="tired">Tired - Low energy</option>
+                        <option value="beat">Beat - Need rest day</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="saveRecovery()" style="padding: 8px;">Log Recovery</button>
+                </div>
+            </div>
+
             <div class="card">
                 <h3>Log Workout</h3>
                 <div class="card-body">
@@ -709,6 +729,17 @@
                 workouts = data.workouts || [];
                 meals = data.meals || [];
                 bodyweights = data.bodyweights || [];
+                
+                // Load today's recovery if exists
+                const today = new Date().toISOString().split('T')[0];
+                const todayRec = (data.recovery || []).find(r => r.date === today);
+                if (todayRec) {
+                    todayRecovery = todayRec;
+                    document.getElementById('sleep-hours').value = todayRec.sleep || '';
+                    document.getElementById('resting-hr').value = todayRec.rhr || '';
+                    document.getElementById('recovery-feeling').value = todayRec.feeling || '';
+                }
+                
                 updateBodyweightDisplay();
                 updateStreakDisplay();
             } catch (e) { 
@@ -896,6 +927,91 @@
             } else {
                 banner.style.display = 'none';
             }
+        }
+
+        // Recovery data
+        let todayRecovery = null;
+
+        async function saveRecovery() {
+            const sleep = parseFloat(document.getElementById('sleep-hours').value);
+            const rhr = parseInt(document.getElementById('resting-hr').value);
+            const feeling = document.getElementById('recovery-feeling').value;
+            
+            if (!sleep && !rhr && !feeling) return;
+            
+            todayRecovery = {
+                date: new Date().toISOString().split('T')[0],
+                sleep,
+                rhr,
+                feeling,
+                timestamp: Date.now()
+            };
+            
+            // Save to server
+            try {
+                await fetch('/api/recovery', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(todayRecovery)
+                });
+                
+                if (navigator.vibrate) navigator.vibrate(50);
+                
+                // Update workout recommendation based on recovery
+                adjustWorkoutForRecovery();
+                
+                alert('Recovery logged! Workout adjusted.');
+            } catch (e) {
+                console.error('Failed to save recovery:', e);
+            }
+        }
+
+        function adjustWorkoutForRecovery() {
+            if (!todayRecovery) return;
+            
+            const { sleep, rhr, feeling } = todayRecovery;
+            let adjustment = '';
+            
+            // Recovery scoring
+            let recoveryScore = 5; // neutral
+            
+            if (sleep) {
+                if (sleep < 6) recoveryScore -= 2;
+                else if (sleep > 8) recoveryScore += 1;
+            }
+            
+            if (feeling) {
+                const feelingScores = { beat: -2, tired: -1, okay: 0, good: 1, great: 2 };
+                recoveryScore += feelingScores[feeling] || 0;
+            }
+            
+            // Show adjustment in plan
+            const planSection = document.getElementById('plan');
+            if (planSection.classList.contains('active')) {
+                renderPlan(); // Re-render with recovery note
+            }
+        }
+
+        function getRecoveryNote() {
+            if (!todayRecovery) return '';
+            
+            const { sleep, feeling } = todayRecovery;
+            
+            if (feeling === 'beat' || feeling === 'tired' || sleep < 6) {
+                return `
+                <div style="margin-bottom: 12px; padding: 10px 12px; background: var(--bg-tactical); border-left: 3px solid var(--warning);"
+                <div style="color: var(--warning); font-size: 11px; font-weight: 600;">⚠️ RECOVERY ADJUSTMENT</div>
+                <div style="color: var(--text-muted); font-size: 10px; margin-top: 4px;">Lower intensity today. Drop 1-2 sets or reduce weight by 10%.</div>
+                </div>`;
+            } else if (feeling === 'great') {
+                return `
+                <div style="margin-bottom: 12px; padding: 10px 12px; background: var(--bg-tactical); border-left: 3px solid var(--accent);">
+                <div style="color: var(--accent); font-size: 11px; font-weight: 600;">⚡ FULL SEND MODE</div>
+                <div style="color: var(--text-muted); font-size: 10px; margin-top: 4px;">Recovery looks good. Push for PRs today.</div>
+                </div>`;
+            }
+            
+            return '';
         }
 
         // Show last workout hint for current exercise
@@ -1444,6 +1560,7 @@
             const nextDiv = document.getElementById('next-workout');
             
             const workout = generateAdaptiveWorkout(nextType);
+            const recoveryNote = getRecoveryNote();
             
             const weakAreaHtml = workout.weakAreas.length > 0 
                 ? `<div style="margin-bottom: 12px; padding: 8px 12px; background: var(--bg-tactical); border-left: 3px solid var(--warning); font-size: 10px; color: var(--text-muted);">
@@ -1456,6 +1573,7 @@
                     <div style="color: var(--accent); font-size: 16px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">${workout.name}</div>
                     <div style="color: var(--text-muted); font-size: 11px; text-transform: uppercase;">${workout.focus}</div>
                 </div>
+                ${recoveryNote}
                 ${weakAreaHtml}
                 ${workout.exercises.map(ex => `
                     <div class="session-exercise plan-exercise" style="padding: 6px 0; cursor: pointer;" onclick="showExerciseHistory('${ex.name}')">

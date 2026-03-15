@@ -154,6 +154,37 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // API: Add recovery data
+  if (url.pathname === '/api/recovery' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const recovery = JSON.parse(body);
+        const data = loadData();
+        if (!data.recovery) data.recovery = [];
+        
+        // Replace if entry for today exists
+        const today = new Date().toISOString().split('T')[0];
+        const existingIndex = data.recovery.findIndex(r => r.date === today);
+        if (existingIndex >= 0) {
+          data.recovery[existingIndex] = recovery;
+        } else {
+          data.recovery.push(recovery);
+        }
+        
+        saveData(data);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+        gitCommit(`Recovery: ${recovery.sleep}h sleep, feeling ${recovery.feeling}`);
+      } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   // Serve static files
   let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
   filePath = path.join(__dirname, filePath);

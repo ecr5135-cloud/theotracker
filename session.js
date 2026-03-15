@@ -13,7 +13,7 @@ function loadData() {
   try {
     return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   } catch {
-    return { workouts: [], meals: [], bodyweights: [] };
+    return { workouts: [], meals: [], bodyweights: [], recovery: [] };
   }
 }
 
