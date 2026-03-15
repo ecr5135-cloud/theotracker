@@ -211,3 +211,16 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`TheoTracker running at http://localhost:${PORT}`);
 });
+
+// Handle port conflicts gracefully
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`Port ${PORT} is busy, waiting...`);
+    setTimeout(() => {
+      server.close();
+      server.listen(PORT, '0.0.0.0');
+    }, 5000);
+  } else {
+    console.error('Server error:', err);
+  }
+});
