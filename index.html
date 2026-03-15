@@ -706,6 +706,12 @@
         <!-- PROGRESS SECTION -->
         <div id="progress" class="section">
             <div class="card">
+                <h3>This Week</h3>
+                <div id="weekly-summary" class="card-body">
+                    <div class="empty-state">Log workouts to see weekly stats.</div>
+                </div>
+            </div>
+            <div class="card">
                 <h3>Lift Progress</h3>
                 <select id="chart-exercise" onchange="updateChart()"><option value="">Select exercise</option></select>
                 <div class="chart-container"><canvas id="progressChart"></canvas></div>
@@ -1098,6 +1104,11 @@
             const mins = Math.floor(restSeconds / 60).toString().padStart(2, '0');
             const secs = (restSeconds % 60).toString().padStart(2, '0');
             document.getElementById('rest-timer-display').textContent = `${mins}:${secs}`;
+            
+            // Play beep at 0, 30s, 60s remaining
+            if ([0, 30, 60].includes(restSeconds)) {
+                playBeep();
+            }
         }
 
         function addRestTime(seconds) {
@@ -1108,6 +1119,28 @@
         function dismissRestTimer() {
             clearInterval(restTimerInterval);
             document.getElementById('rest-timer').style.display = 'none';
+        }
+
+        // Play beep sound for rest timer
+        function playBeep() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (e) {
+                console.log('Audio not supported');
+            }
         }
 
         // Export data
@@ -1290,7 +1323,56 @@
                     </div>
                 `).join('');
 
+            // Update weekly summary
+            updateWeeklySummary();
+
             if (uniqueExercises.length > 0) { select.value = uniqueExercises[0]; updateChart(); }
+        }
+
+        function updateWeeklySummary() {
+            const now = new Date();
+            const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+            
+            const thisWeekWorkouts = workouts.filter(w => new Date(w.date) >= weekAgo);
+            const totalVolume = thisWeekWorkouts.reduce((sum, w) => {
+                const exercises = w.exercises || (w.sets ? [{name: w.exercise, sets: w.sets}] : []);
+                return sum + calculateVolume(exercises);
+            }, 0);
+            
+            const workoutDays = [...new Set(thisWeekWorkouts.map(w => w.date.split('T')[0]))].length;
+            const totalSets = thisWeekWorkouts.reduce((sum, w) => {
+                const exercises = w.exercises || (w.sets ? [{sets: w.sets}] : []);
+                return sum + exercises.reduce((eSum, e) => eSum + e.sets.length, 0);
+            }, 0);
+            
+            const summaryDiv = document.getElementById('weekly-summary');
+            
+            if (thisWeekWorkouts.length === 0) {
+                summaryDiv.innerHTML = '<div class="empty-state">Log workouts to see weekly stats.</div>';
+                return;
+            }
+            
+            summaryDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center;">
+                    <div>
+                        <div style="color: var(--accent); font-size: 24px; font-weight: 700;">${workoutDays}</div>
+                        <div style="color: var(--text-muted); font-size: 9px; text-transform: uppercase;">Workouts</div>
+                    </div>
+                    <div>
+                        <div style="color: var(--accent); font-size: 24px; font-weight: 700;">${totalSets}</div>
+                        <div style="color: var(--text-muted); font-size: 9px; text-transform: uppercase;">Total Sets</div>
+                    </div>
+                    <div>
+                        <div style="color: var(--accent); font-size: 24px; font-weight: 700;">${(totalVolume / 1000).toFixed(1)}k</div>
+                        <div style="color: var(--text-muted); font-size: 9px; text-transform: uppercase;">Lbs Volume</div>
+                    </div>
+                </div>
+                <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);">
+                    <div style="color: var(--text-muted); font-size: 10px; text-align: center;">
+                        ${workoutDays >= 4 ? '🔥 Great week!' : workoutDays >= 3 ? '💪 Solid week' : 'Keep building the habit'}
+                    </div>
+                </div>
+            `;
         }
 
         // PLAN FUNCTIONS
