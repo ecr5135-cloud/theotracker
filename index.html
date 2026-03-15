@@ -666,7 +666,10 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg-tactical); border-bottom: 1px solid var(--border);">
                     <h3 style="border: none; padding: 0;">Recent Workouts</h3>
-                    <button onclick="exportData()" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 10px;">Export</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="exportCSV()" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 10px;">CSV</button>
+                        <button onclick="exportData()" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 10px;">JSON</button>
+                    </div>
                 </div>
                 <div id="workout-stats" style="padding: 12px 16px; background: var(--bg-card); border-bottom: 1px solid var(--border); display: none;">
                     <div style="display: flex; gap: 16px;">
@@ -816,12 +819,17 @@
                 document.getElementById('sets-container').innerHTML = `<div class="set-row"><input type="number" placeholder="Reps" class="reps"><input type="number" placeholder="Weight" class="weight"><button class="remove-set" onclick="removeSet(this)">×</button></div>`;
 
                 const btn = event.target;
-                btn.textContent = result.isPR ? 'PR Saved!' : 'Saved!';
+                btn.textContent = result.isPR ? '🏆 PR Saved!' : '✓ Saved!';
                 if (navigator.vibrate) navigator.vibrate(50);
                 setTimeout(() => btn.textContent = 'Save Workout', 1000);
                 await loadData();
                 showLastWorkout();
                 startRestTimer(90);
+                
+                // Celebration if PR
+                if (result.isPR) {
+                    showCelebration(`New PR! ${result.thisMax} lbs`);
+                }
             } catch (e) { alert('Failed to save: ' + e.message); }
         }
 
@@ -1121,6 +1129,75 @@
             document.getElementById('rest-timer').style.display = 'none';
         }
 
+        // Celebration animation for PRs
+        function showCelebration(message) {
+            const div = document.createElement('div');
+            div.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: var(--accent);
+                color: #000;
+                padding: 20px 40px;
+                font-size: 18px;
+                font-weight: 700;
+                text-transform: uppercase;
+                z-index: 1000;
+                animation: celebrate 2s ease-out forwards;
+                text-align: center;
+            `;
+            div.textContent = message;
+            
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes celebrate {
+                    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+                    20% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+                    80% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+                    100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+            document.body.appendChild(div);
+            
+            setTimeout(() => {
+                div.remove();
+                style.remove();
+            }, 2000);
+            
+            // Confetti effect using canvas
+            createConfetti();
+        }
+        
+        function createConfetti() {
+            const colors = ['#4ade80', '#22c55e', '#f59e0b', '#ffffff'];
+            for (let i = 0; i < 30; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.cssText = `
+                    position: fixed;
+                    width: 8px;
+                    height: 8px;
+                    background: ${colors[Math.floor(Math.random() * colors.length)]};
+                    left: ${Math.random() * 100}vw;
+                    top: -10px;
+                    z-index: 999;
+                    animation: fall ${1 + Math.random()}s linear forwards;
+                `;
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 2000);
+            }
+            
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fall {
+                    to { transform: translateY(100vh) rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+            setTimeout(() => style.remove(), 2000);
+        }
+
         // Play beep sound for rest timer
         function playBeep() {
             try {
@@ -1151,6 +1228,30 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = `theotracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Export to CSV
+        function exportCSV() {
+            let csv = 'Date,Exercise,Weight,Reps,Volume\n';
+            
+            workouts.forEach(w => {
+                const date = w.date.split('T')[0];
+                const exercises = w.exercises || (w.sets ? [{name: w.exercise, sets: w.sets}] : []);
+                
+                exercises.forEach(e => {
+                    e.sets.forEach(s => {
+                        csv += `${date},${e.name},${s.weight},${s.reps},${s.weight * s.reps}\n`;
+                    });
+                });
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `theotracker-workouts-${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             URL.revokeObjectURL(url);
         }
