@@ -1135,66 +1135,263 @@
             return cycle[lastType];
         }
 
+        // ADAPTIVE WORKOUT GENERATOR
+        // Exercise pools for each PPL category with variations
+        const EXERCISE_POOLS = {
+            push: {
+                chest: [
+                    { name: 'Smith Machine Bench Press', sets: 4, reps: '8-10', priority: 'high' },
+                    { name: 'Incline Smith Press', sets: 3, reps: '10-12', priority: 'high' },
+                    { name: 'Chest Press Machine', sets: 3, reps: '10-12', priority: 'medium' },
+                    { name: 'Dumbbell Bench Press', sets: 3, reps: '10-12', priority: 'medium' },
+                    { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', priority: 'high' },
+                    { name: 'Cable Fly', sets: 3, reps: '12-15', priority: 'medium' },
+                    { name: 'Pec Deck', sets: 3, reps: '12-15', priority: 'medium' },
+                    { name: 'Chest Dip Machine', sets: 3, reps: '10-12', priority: 'low' }
+                ],
+                shoulders: [
+                    { name: 'Overhead Press', sets: 3, reps: '8-10', priority: 'high' },
+                    { name: 'Dumbbell Shoulder Press', sets: 3, reps: '10-12', priority: 'high' },
+                    { name: 'Lateral Raise', sets: 3, reps: '12-15', priority: 'high' },
+                    { name: 'Cable Lateral Raise', sets: 3, reps: '15-20', priority: 'medium' },
+                    { name: 'Front Raise', sets: 3, reps: '12-15', priority: 'medium' },
+                    { name: 'Rear Delt Fly', sets: 3, reps: '15-20', priority: 'medium' },
+                    { name: 'Arnold Press', sets: 3, reps: '10-12', priority: 'low' }
+                ],
+                triceps: [
+                    { name: 'Tricep Pushdown', sets: 3, reps: '12-15', priority: 'high' },
+                    { name: 'Overhead Tricep Extension', sets: 3, reps: '12-15', priority: 'high' },
+                    { name: 'Cable Tricep Kickback', sets: 3, reps: '15-20', priority: 'medium' },
+                    { name: 'Close Grip Smith Press', sets: 3, reps: '10-12', priority: 'medium' },
+                    { name: 'Tricep Dip Machine', sets: 3, reps: '10-12', priority: 'low' }
+                ]
+            },
+            pull: {
+                back: [
+                    { name: 'Lat Pulldown', sets: 4, reps: '10-12', priority: 'high' },
+                    { name: 'Cable Row', sets: 4, reps: '10-12', priority: 'high' },
+                    { name: 'Dumbbell Row', sets: 3, reps: '10-12', priority: 'high' },
+                    { name: 'Machine Row', sets: 3, reps: '10-12', priority: 'medium' },
+                    { name: 'Straight Arm Pulldown', sets: 3, reps: '12-15', priority: 'medium' },
+                    { name: 'Pullover Machine', sets: 3, reps: '12-15', priority: 'medium' },
+                    { name: 'Shrugs', sets: 4, reps: '12-15', priority: 'low' }
+                ],
+                rearDelts: [
+                    { name: 'Face Pull', sets: 3, reps: '15-20', priority: 'high' },
+                    { name: 'Reverse Pec Deck', sets: 3, reps: '15-20', priority: 'high' },
+                    { name: 'Reverse Cable Fly', sets: 3, reps: '15-20', priority: 'medium' }
+                ],
+                biceps: [
+                    { name: 'Dumbbell Curl', sets: 3, reps: '10-12', priority: 'high' },
+                    { name: 'Hammer Curl', sets: 3, reps: '10-12', priority: 'high' },
+                    { name: 'Cable Curl', sets: 3, reps: '12-15', priority: 'medium' },
+                    { name: 'Preacher Curl', sets: 3, reps: '10-12', priority: 'medium' },
+                    { name: 'Incline Dumbbell Curl', sets: 3, reps: '12-15', priority: 'medium' }
+                ]
+            },
+            legs: {
+                quads: [
+                    { name: 'Smith Machine Squat', sets: 4, reps: '8-10', priority: 'high' },
+                    { name: 'Leg Press', sets: 4, reps: '10-12', priority: 'high' },
+                    { name: 'Hack Squat', sets: 3, reps: '10-12', priority: 'medium' },
+                    { name: 'Goblet Squat', sets: 3, reps: '12-15', priority: 'medium' },
+                    { name: 'Leg Extension', sets: 3, reps: '12-15', priority: 'medium' },
+                    { name: 'Lunges', sets: 3, reps: '12-15', priority: 'low' }
+                ],
+                hamstrings: [
+                    { name: 'Romanian Deadlift', sets: 3, reps: '10-12', priority: 'high' },
+                    { name: 'Leg Curl', sets: 3, reps: '12-15', priority: 'high' },
+                    { name: 'Stiff Leg Deadlift', sets: 3, reps: '10-12', priority: 'medium' },
+                    { name: 'Good Morning', sets: 3, reps: '12-15', priority: 'low' }
+                ],
+                calves: [
+                    { name: 'Calf Raise', sets: 4, reps: '15-20', priority: 'high' },
+                    { name: 'Seated Calf Raise', sets: 3, reps: '15-20', priority: 'medium' },
+                    { name: 'Single Leg Calf Raise', sets: 3, reps: '15-20', priority: 'low' }
+                ]
+            }
+        };
+
+        // Track exercise frequency and last performed date
+        function getExerciseStats() {
+            const stats = {};
+            const now = new Date();
+            
+            // Initialize stats for all exercises
+            Object.values(EXERCISE_POOLS).forEach(category => {
+                Object.values(category).forEach(group => {
+                    group.forEach(ex => {
+                        stats[ex.name] = {
+                            count: 0,
+                            lastDate: null,
+                            totalVolume: 0,
+                            avgWeight: 0
+                        };
+                    });
+                });
+            });
+            
+            // Count from workout history
+            workouts.forEach(w => {
+                const exercises = w.exercises || (w.sets ? [{name: w.exercise, sets: w.sets}] : []);
+                exercises.forEach(e => {
+                    if (stats[e.name]) {
+                        stats[e.name].count++;
+                        stats[e.name].lastDate = w.date;
+                        const volume = e.sets.reduce((sum, s) => sum + (s.weight * s.reps), 0);
+                        stats[e.name].totalVolume += volume;
+                        const avg = e.sets.reduce((sum, s) => sum + s.weight, 0) / e.sets.length;
+                        stats[e.name].avgWeight = Math.max(stats[e.name].avgWeight, avg);
+                    }
+                });
+            });
+            
+            return stats;
+        }
+
+        // Calculate exercise score (higher = should prioritize)
+        function calculateExerciseScore(exercise, stats) {
+            const stat = stats[exercise.name] || { count: 0, lastDate: null };
+            const now = new Date();
+            const daysSinceLast = stat.lastDate ? (now - new Date(stat.lastDate)) / 86400000 : 999;
+            
+            let score = 0;
+            
+            // Prioritize exercises not done recently
+            score += Math.min(daysSinceLast / 7, 5); // Up to 5 points for being old
+            
+            // Priority multiplier
+            if (exercise.priority === 'high') score *= 1.5;
+            if (exercise.priority === 'low') score *= 0.7;
+            
+            // Penalize overused exercises
+            score -= stat.count * 0.3;
+            
+            return score;
+        }
+
+        // Identify weak areas based on workout history
+        function identifyWeakAreas() {
+            const stats = getExerciseStats();
+            const muscleGroups = {
+                'Chest': ['Smith Machine Bench Press', 'Incline Dumbbell Press', 'Chest Press Machine', 'Dumbbell Bench Press', 'Cable Fly', 'Pec Deck'],
+                'Back': ['Lat Pulldown', 'Cable Row', 'Dumbbell Row', 'Machine Row', 'Straight Arm Pulldown'],
+                'Shoulders': ['Overhead Press', 'Dumbbell Shoulder Press', 'Lateral Raise', 'Rear Delt Fly'],
+                'Legs': ['Smith Machine Squat', 'Leg Press', 'Romanian Deadlift', 'Leg Curl', 'Leg Extension'],
+                'Arms': ['Dumbbell Curl', 'Hammer Curl', 'Tricep Pushdown', 'Overhead Tricep Extension']
+            };
+            
+            const weakAreas = [];
+            
+            Object.entries(muscleGroups).forEach(([group, exercises]) => {
+                const groupStats = exercises.map(ex => stats[ex]).filter(Boolean);
+                const totalVolume = groupStats.reduce((sum, s) => sum + s.totalVolume, 0);
+                const avgCount = groupStats.reduce((sum, s) => sum + s.count, 0) / groupStats.length || 0;
+                
+                // If group has low volume or rarely trained
+                if (avgCount < 2 || totalVolume < 5000) {
+                    weakAreas.push(group);
+                }
+            });
+            
+            return weakAreas;
+        }
+
+        // Generate adaptive workout
+        function generateAdaptiveWorkout(workoutType) {
+            const stats = getExerciseStats();
+            const weakAreas = identifyWeakAreas();
+            
+            const pool = EXERCISE_POOLS[workoutType];
+            const selected = [];
+            const usedNames = new Set();
+            
+            // Helper to pick best exercise from a group
+            function pickFromGroup(group, count) {
+                const available = pool[group].filter(ex => !usedNames.has(ex.name));
+                const scored = available.map(ex => ({
+                    ...ex,
+                    score: calculateExerciseScore(ex, stats)
+                })).sort((a, b) => b.score - a.score);
+                
+                const picked = scored.slice(0, count);
+                picked.forEach(ex => usedNames.add(ex.name));
+                return picked;
+            }
+            
+            if (workoutType === 'push') {
+                // Always include a main chest press
+                selected.push(...pickFromGroup('chest', 2));
+                selected.push(...pickFromGroup('shoulders', 2));
+                selected.push(...pickFromGroup('triceps', 2));
+                
+                // If shoulders are weak, add extra shoulder work
+                if (weakAreas.includes('Shoulders')) {
+                    selected.push(...pickFromGroup('shoulders', 1));
+                }
+            } else if (workoutType === 'pull') {
+                selected.push(...pickFromGroup('back', 3));
+                selected.push(...pickFromGroup('rearDelts', 1));
+                selected.push(...pickFromGroup('biceps', 2));
+                
+                // If arms are weak, extra bicep work
+                if (weakAreas.includes('Arms')) {
+                    selected.push(...pickFromGroup('biceps', 1));
+                }
+            } else if (workoutType === 'legs') {
+                selected.push(...pickFromGroup('quads', 3));
+                selected.push(...pickFromGroup('hamstrings', 2));
+                selected.push(...pickFromGroup('calves', 1));
+                
+                // If hamstrings are weak (common), add more
+                if (weakAreas.includes('Legs')) {
+                    selected.push(...pickFromGroup('hamstrings', 1));
+                }
+            }
+            
+            return {
+                name: workoutType.toUpperCase(),
+                focus: getFocusFromType(workoutType),
+                exercises: selected,
+                weakAreas: weakAreas
+            };
+        }
+
+        function getFocusFromType(type) {
+            const focus = {
+                push: 'Chest, Shoulders, Triceps',
+                pull: 'Back, Biceps, Rear Delts',
+                legs: 'Quads, Hamstrings, Calves'
+            };
+            return focus[type];
+        }
+
         function renderPlan() {
             const nextType = getNextPPLWorkout();
             const nextDiv = document.getElementById('next-workout');
             
-            const workoutData = {
-                push: {
-                    name: 'PUSH',
-                    focus: 'Chest, Shoulders, Triceps',
-                    exercises: [
-                        { name: 'Smith Machine Bench Press', sets: 4, reps: '8-10' },
-                        { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12' },
-                        { name: 'Cable Fly', sets: 3, reps: '12-15' },
-                        { name: 'Overhead Press', sets: 3, reps: '8-10' },
-                        { name: 'Lateral Raise', sets: 3, reps: '12-15' },
-                        { name: 'Tricep Pushdown', sets: 3, reps: '12-15' },
-                        { name: 'Overhead Tricep Extension', sets: 3, reps: '12-15' }
-                    ]
-                },
-                pull: {
-                    name: 'PULL',
-                    focus: 'Back, Biceps, Rear Delts',
-                    exercises: [
-                        { name: 'Lat Pulldown', sets: 4, reps: '10-12' },
-                        { name: 'Cable Row', sets: 4, reps: '10-12' },
-                        { name: 'Dumbbell Row', sets: 3, reps: '10-12' },
-                        { name: 'Face Pull', sets: 3, reps: '15-20' },
-                        { name: 'Dumbbell Curl', sets: 3, reps: '10-12' },
-                        { name: 'Hammer Curl', sets: 3, reps: '10-12' },
-                        { name: 'Reverse Fly', sets: 3, reps: '15-20' }
-                    ]
-                },
-                legs: {
-                    name: 'LEGS',
-                    focus: 'Quads, Hamstrings, Calves',
-                    exercises: [
-                        { name: 'Smith Machine Squat', sets: 4, reps: '8-10' },
-                        { name: 'Leg Press', sets: 4, reps: '10-12' },
-                        { name: 'Romanian Deadlift', sets: 3, reps: '10-12' },
-                        { name: 'Leg Curl', sets: 3, reps: '12-15' },
-                        { name: 'Leg Extension', sets: 3, reps: '12-15' },
-                        { name: 'Calf Raise', sets: 4, reps: '15-20' }
-                    ]
-                }
-            };
+            const workout = generateAdaptiveWorkout(nextType);
             
-            const workout = workoutData[nextType];
+            const weakAreaHtml = workout.weakAreas.length > 0 
+                ? `<div style="margin-bottom: 12px; padding: 8px 12px; background: var(--bg-tactical); border-left: 3px solid var(--warning); font-size: 10px; color: var(--text-muted);">
+                    <span style="color: var(--warning);">⚡ Focus areas:</span> ${workout.weakAreas.join(', ')}
+                   </div>`
+                : '';
             
             nextDiv.innerHTML = `
                 <div style="margin-bottom: 16px;">
                     <div style="color: var(--accent); font-size: 16px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">${workout.name}</div>
                     <div style="color: var(--text-muted); font-size: 11px; text-transform: uppercase;">${workout.focus}</div>
                 </div>
+                ${weakAreaHtml}
                 ${workout.exercises.map(ex => `
                     <div class="session-exercise plan-exercise" style="padding: 6px 0; cursor: pointer;" onclick="showExerciseHistory('${ex.name}')">
-                        <div class="session-exercise-name">${ex.name}</div>
+                        <div class="session-exercise-name">${ex.name} ${ex.priority === 'high' ? '<span style="color: var(--accent-dim); font-size: 9px;">★</span>' : ''}</div>
                         <div class="session-exercise-sets">${ex.sets} sets × ${ex.reps} reps</div>
                     </div>
                 `).join('')}
                 <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); text-align: center;">
-                    <div style="color: var(--text-muted); font-size: 10px; text-transform: uppercase;">Rest whenever needed. Resume the cycle when ready.</div>
+                    <div style="color: var(--text-muted); font-size: 10px; text-transform: uppercase;">★ = Priority movement</div>
                 </div>
             `;
         }
