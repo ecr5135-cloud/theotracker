@@ -1,19 +1,14 @@
 {
   "workouts": [],
-  "meals": [
-    {
-      "id": 1773615420000,
-      "date": "2026-03-15T22:57:00.000Z",
-      "name": "Chicken Parmesan Pasta (2 plates)",
-      "calories": 2300,
-      "protein": 170
-    },
-    {
-      "id": 1773603420000,
-      "date": "2026-03-15T19:57:00.000Z",
-      "name": "Chewy Protein Bar",
-      "calories": 190,
-      "protein": 10
-    }
-  ]
+  "substances": {
+    "nicotine": [],
+    "caffeine": [
+      {
+        "id": 1773914905703,
+        "date": "2026-03-19T10:08:25.703Z",
+        "amount": 100,
+        "source": "pill"
+      }
+    ]
+  }
 }
