@@ -1,7 +1,14 @@
 {
   "workouts": [],
   "substances": {
-    "nicotine": [],
+    "nicotine": [
+      {
+        "id": 1773915010113,
+        "date": "2026-03-19T10:10:10.113Z",
+        "amount": 4,
+        "source": "gum"
+      }
+    ],
     "caffeine": [
       {
         "id": 1773914905703,
